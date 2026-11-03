@@ -15,6 +15,15 @@ function addMessage(text, type = '') {
   const el = document.createElement('div');
   el.className = `message ${type}`;
   el.textContent = text; // Sheet contents and questions are always rendered as text.
+  const booking = type !== 'user' && text.match(/^Demo booking: (booking\.html\?tour=ACT\d{3})$/m);
+  if(booking) {
+    const [before,after]=text.split(booking[0]);
+    el.textContent=before;
+    const link=document.createElement('a');
+    link.href=booking[1]; link.textContent='Open demo booking →';
+    el.append(link);
+    const rest=document.createElement('span'); rest.textContent=after; el.append(rest);
+  }
   messages.append(el);
   messages.scrollTop = messages.scrollHeight;
 }

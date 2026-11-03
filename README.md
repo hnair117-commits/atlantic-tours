@@ -1,5 +1,7 @@
 # Atlantic Tours
 
+Broad activity requests ask for a destination before listing two concise choices. Off-topic questions receive a friendly redirect; food-order requests can lead into food-tour discovery. “Book tour 1” resolves against the most recently displayed list, while ambiguous selections ask for clarification. Named-tour booking checks current weekly slots. `booking.html` is a dummy booking page: no payment, personal data, actual booking or inventory changes. Conversation memory lasts for the current page session.
+
 Broad county queries such as “Galway” now ask about interests before showing individual tours. Available activity choices are derived from current data; the county and chosen activity persist for later budget and detail questions. “Start over” resets these preferences.
 
 The visitor interface offers conversational summaries, combined activity/county/budget filters, numbered follow-ups, meeting points, durations, and incremental browsing. The spreadsheet link is removed from the customer interface. `guide.js` implements conversation rules, not a generative language model. The backing sheet remains publicly readable for browser access.

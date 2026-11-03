@@ -43,5 +43,39 @@ test('discovery questions still use current rows',()=>{
  const {ask,run}=setup();run('tours=tours.filter(r=>field(r,"category")!=="Food Tour")');assert.doesNotMatch(ask('Galway'),/food experiences/);
 });
 test('start over clears destination preference',()=>{
- const {ask}=setup();ask('Galway');ask('start over');assert.match(ask('food'),/Galway City Food/);
+ const {ask}=setup();ask('Galway');ask('start over');assert.match(ask('food'),/Where would you like to explore/);
+});
+test('walking question probes before giving options',()=>{
+ const {ask}=setup();const a=ask('do you have walking tours');assert.match(a,/Where would you like/);assert.doesNotMatch(a,/ACT\d|€|Cliffs of Moher/);
+ const b=ask('Galway');assert.match(b,/two ideas/);assert.match(b,/Connemara National Park Hike/);assert.doesNotMatch(b,/slots|Operating schedule|Climb Diamond Hill/);
+});
+test('book tour 1 resolves the latest displayed list',()=>{
+ const {ask}=setup();ask('walking tours');ask('Galway');const a=ask('book tour 1');assert.match(a,/Connemara National Park Hike/);assert.match(a,/booking\.html\?tour=ACT003/);assert.match(a,/no place is reserved/);
+});
+test('book this tour follows a narrowed selection',()=>{
+ const {ask}=setup();ask('walking tours');ask('Galway');ask('tell me about the second one');assert.match(ask('book this tour'),/booking\.html\?tour=ACT026/);
+});
+test('ambiguous booking asks which tour',()=>{
+ const {ask}=setup();ask('walking tours');ask('Galway');const a=ask('book this tour');assert.match(a,/Which one/);assert.doesNotMatch(a,/booking\.html/);
+});
+test('invalid option cannot silently choose another tour',()=>{
+ const {ask}=setup();ask('walking tours');ask('Galway');assert.match(ask('book tour 8'),/don’t have that option/);
+});
+test('booking uses current slots and handles removed tours',()=>{
+ const {ask,run}=setup();ask('walking tours');ask('Galway');run('tours.find(r=>rowIdentity(r)==="ACT003").find(c=>c.header==="slots_this_week").value="0"');
+ assert.match(ask('book tour 1'),/no slots listed/);run('tours=tours.filter(r=>rowIdentity(r)!=="ACT003")');assert.doesNotMatch(ask('book tour 1'),/booking\.html/);
+});
+test('burger request redirects playfully without promising delivery',()=>{
+ const {ask}=setup();const a=ask('cani order food burger');assert.match(a,/grill is imaginary/);assert.match(a,/can’t order food/);assert.match(a,/food tours/);
+ assert.match(ask('yes'),/Galway City Food Tour/);
+});
+test('unrelated request preserves the numbered tour context',()=>{
+ const {ask}=setup();ask('walking tours');ask('Galway');ask('tell me about space penguins');assert.match(ask('book tour 2'),/booking\.html\?tour=ACT026/);
+});
+test('default tour summaries omit descriptions and schedule dumps',()=>{
+ const {ask}=setup();const a=ask('ACT001');assert.doesNotMatch(a,/seabird|Operating schedule|slots are listed/);assert.match(ask('ACT001 details'),/seabird/);
+});
+test('demo page collects no personal or payment data',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../booking.html'),'utf8');assert.match(html,/demonstration/);assert.doesNotMatch(html,/<input|<form/);
+ const script=fs.readFileSync(path.join(__dirname,'../booking.js'),'utf8');assert.match(script,/no booking has been made/);assert.doesNotMatch(script,/innerHTML|fetch\(/);
 });

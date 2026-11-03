@@ -3,19 +3,35 @@ let lastShown = [];
 let discoveryLocation = '';
 let discoveryActivity = '';
 let awaitingPreference = false;
+let pendingActivity = '';
+let lastBookingTour = '';
 function answer(question, rows) {
-  const q = normalize(question).replace(/\bwhat s\b/g, 'what is');
+  const q = normalize(question).replace(/\bcani\b/g,'can i').replace(/\bwalking\b/g,'walk').replace(/\bwhat s\b/g, 'what is');
   const get = (r,k) => field(r,k);
   const money = r => new Intl.NumberFormat('en-IE',{style:'currency',currency:'EUR'}).format(numeric(r,'price_eur'));
   const name = r => get(r,'tour_name');
   const snapshot = sourceLabel !== 'live sheet' ? '\n\nI’m using saved information from '+TOUR_SNAPSHOT.captured+' because live updates are unavailable. Prices, offers and availability may be out of date.' : '';
   if (/\b(start over|reset|anywhere|all destinations)\b/.test(q)) {
-    discoveryLocation = ''; discoveryActivity = ''; awaitingPreference = false; lastShown = [];
+    discoveryLocation = ''; discoveryActivity = ''; pendingActivity = ''; lastBookingTour = ''; awaitingPreference = false; lastShown = [];
     return 'Let’s start fresh. Would you like to explore Galway, Clare or Mayo?';
   }
   if (/^(hi|hello|hey|hello there)$/.test(q)) return 'Hello! What kind of day would you enjoy—food, a walk, cycling or time on the water? Tell me a destination and a budget, and I’ll help narrow it down.';
   if (/^(thanks|thank you|cheers)$/.test(q)) return 'You’re welcome! Let me know if you’d like to compare another tour.';
-  if (/\b(book|booking|reserve|reservation)\b/.test(q)) return 'I can help you choose a tour and check its listed availability, but I can’t make a booking or take payment here. Which tour are you interested in?';
+  const bookingIntent = /\b(book|booking|reserve|reservation)\b/.test(q);
+  if(bookingIntent) {
+    const direct = rows.filter(r=>get(r,'tour_id') && (q.includes(normalize(get(r,'tour_id'))) || q.includes(normalize(name(r)))));
+    const selection=q.match(/\b(?:tour|option|number)\s*(\d+)\b|\b(first|second|third|fourth|fifth|last)\b|\b(\d+)\b/);
+    const selectedIndex=selection ? (selection[1] ? +selection[1]-1 : selection[2] ? ({first:0,second:1,third:2,fourth:3,fifth:4,last:lastShown.length-1}[selection[2]]) : +selection[3]-1) : -1;
+    let selected = direct.length===1 ? direct[0] : selectedIndex>=0 ? rows.find(r=>rowIdentity(r)===lastShown[selectedIndex]) : lastShown.length===1 ? rows.find(r=>rowIdentity(r)===lastShown[0]) : null;
+    if(!selected) return selection ? 'I don’t have that option in the last list. Please choose one of the tour numbers I showed you, or give me the tour name.' : lastShown.length>1 ? 'Which one would you like? Say “book tour 1” or give me its name, and I’ll open a demo booking link.' : 'Let’s choose a tour first. Would you prefer food, walking, cycling or time on the water?';
+    if(numeric(selected,'slots_this_week')===0) return `${name(selected)} has no slots listed this week. Shall we look for another tour?`+snapshot;
+    lastBookingTour=rowIdentity(selected); lastShown=[lastBookingTour];
+    return `You’ve chosen ${name(selected)}. Here’s its demo booking page:\n\nDemo booking: booking.html?tour=${encodeURIComponent(lastBookingTour)}\n\nThis is a practice booking only—no place is reserved and no payment is taken.`+snapshot;
+  }
+  if(/\b(burger|burgers|pizza|takeaway|takeout|order food|food delivery)\b/.test(q)) {
+    pendingActivity='Food Tour';
+    return 'My grill is imaginary, but my appetite for Irish adventures is very real! I can’t order food for you. We do have food tours and tastings, though. Would you like to explore those'+(discoveryLocation?' around '+discoveryLocation[0].toUpperCase()+discoveryLocation.slice(1):' in Galway')+'?';
+  }
   if (/\b(categories|types of tours|kinds of tours)\b/.test(q)) return 'You can choose from '+[...new Set(rows.map(r=>get(r,'category')).filter(Boolean))].join(', ')+'. Do you have a destination or budget in mind?'+snapshot;
   const explicit = rows.filter(r => get(r,'tour_id') && get(r,'tour_name') && (q.includes(normalize(get(r,'tour_id'))) || q.includes(normalize(name(r)))));
   const county = ['galway','clare','mayo'].find(c => new RegExp('\\b'+c+'\\b').test(q));
@@ -27,11 +43,22 @@ function answer(question, rows) {
     {pattern:/\b(boat|boats|cruise|sailing)\b/,category:'Boat Tour',label:'boat trips'},
     {pattern:/\b(outdoor|outdoors)\b/,category:'Outdoor Activity',label:'outdoor activities'}
   ];
-  const chosenActivity = activityDefinitions.find(a=>a.pattern.test(q));
+  let chosenActivity = activityDefinitions.find(a=>a.pattern.test(q));
+  const yes=/^(yes|yeah|yep|sure|ok|okay|sounds good|yes please)$/.test(q);
+  if(!chosenActivity && pendingActivity && (county || yes)) {
+    chosenActivity=activityDefinitions.find(a=>a.category===pendingActivity);
+    pendingActivity='';
+    if(yes && chosenActivity?.category==='Food Tour' && !discoveryLocation) discoveryLocation='galway';
+  }
   const specificRequest = /\b(price|prices|cost|costs|cheapest|expensive|under|below|over|above|between|budget|offers|discounts|available|availability|slots|sold|list|show|duration|hours|meeting|details|date|dates|tomorrow|today|when)\b/.test(q);
   if(county && !explicit.length) {
     if(county !== discoveryLocation) discoveryActivity = '';
     discoveryLocation = county;
+  }
+  if(chosenActivity && !explicit.length && !specificRequest && !discoveryLocation) {
+    pendingActivity=chosenActivity.category; lastShown=[];
+    const counties=['galway','clare','mayo'].filter(c=>rows.some(r=>get(r,'category')===chosenActivity.category && normalize(get(r,'location')).includes(c))).map(c=>c[0].toUpperCase()+c.slice(1));
+    return `Yes, we have ${chosenActivity.label}! Where would you like to explore—${counties.join(', ')}?`+snapshot;
   }
   if(county && !explicit.length && !chosenActivity && !specificRequest) {
     const local = rows.filter(r=>normalize(get(r,'location')).includes(county));
@@ -61,7 +88,7 @@ function answer(question, rows) {
   const stop = new Set('a an the are is do does i we you your me my us our for to of in on at and or with from about please show list all tours tour trip trips available availability price prices cost costs much how what which can tell have any there it its this that details information want would like know cheapest expensive hi hello thanks thank many places seats remaining left under below less than over above more between euros eur budget lowest most highest offers offer special deals discounts discount slots week sold out fully booked only hours hour duration long short shortest longest date dates when departure departures meeting point meet start starts where them these those they their categories category recommend recommendations suggest something looking around near visiting visit going enjoy love prefer first second third fourth fifth last one option options also else could should worth best suited suitable'.split(' '));
   const aliases={kayaking:'kayak',kayaks:'kayak',hiking:'hike',hikes:'hike',biking:'cycling',bike:'cycling',boats:'boat',walks:'walk',foods:'food'};
   const calendarWords = new Set('today tomorrow monday tuesday wednesday thursday friday saturday sunday'.split(' '));
-  const conversationWords = new Set('yes yeah sounds good am m interested interest into please actually maybe rather instead experiences experience foodie tasting seafood cruise sailing outdoors'.split(' '));
+  const conversationWords = new Set('yes yeah yep sure ok okay sounds good am m interested interest into please actually maybe rather instead experiences experience foodie tasting seafood cruise sailing outdoors'.split(' '));
   let terms=q.split(' ').filter(t=>!stop.has(t) && !conversationWords.has(t) && !calendarWords.has(t) && !/^[€£]?\d+$/.test(t) && t!=='€').map(t=>aliases[t]||t);
   if (!explicit.length && terms.length) {
     // Counties and activity categories are hard constraints, not optional ranking hints.
@@ -72,7 +99,7 @@ function answer(question, rows) {
     if(residual.length) {
       const scores=matches.map(r=>({r,score:residual.reduce((sum,t)=>sum+(normalize([name(r),get(r,'location'),get(r,'description')].join(' ')).includes(t)?1:0),0)}));
       const best=Math.max(0,...scores.map(s=>s.score));
-      if (!best) return 'I couldn’t match that to one of our tours. Tell me a destination, an activity or a budget—for example, “kayaking in Galway under €70”.';
+      if (!best) return 'I couldn’t match that to our adventures—my compass is better at coastlines than that topic! Would you like food experiences, walking, cycling or time on the water?';
       matches=scores.filter(s=>s.score===best).map(s=>s.r);
     }
   }
@@ -95,10 +122,10 @@ function answer(question, rows) {
   lastShown=shown.map(rowIdentity);
   if(narrowingDiscovery && chosenActivity && !specificRequest) {
     const title=discoveryLocation[0].toUpperCase()+discoveryLocation.slice(1);
-    const suggestions=shown.slice(0,3);
+    const suggestions=shown.slice(0,2);
     lastShown=suggestions.map(rowIdentity);
     const ideas=suggestions.map((r,i)=>`${i+1}. ${name(r)} — ${money(r)}, around ${get(r,'duration_hours')} hours.`).join('\n');
-    return `If you’re interested in ${chosenActivity.label}, here are a few ideas around ${title}:\n\n${ideas}\n\nDoes one of those appeal to you, or do you have a budget in mind?`+snapshot;
+    return `If you’re interested in ${chosenActivity.label}, here are ${suggestions.length===1?'an idea':'two ideas'} around ${title}:\n\n${ideas}\n\nWould you like to know more about one, or try a different budget? You can also say “book tour 1” for a demo booking.`+snapshot;
   }
   const availability=r=>numeric(r,'slots_this_week')===0 ? 'There are no slots listed for this week.' : `${get(r,'slots_this_week')} slots are listed for this week.`;
   const schedule=r=>`Operating schedule: ${get(r,'availability')}.`;
@@ -114,10 +141,10 @@ function answer(question, rows) {
     if(shown.length===1 && slots) return text+`\n${availability(r)} ${schedule(r)} Exact departure dates need confirmation.`;
     if(shown.length===1 && price) return text+`\nThis tour costs ${money(r)}.${get(r,'special_offer')?' Current listed offer: '+get(r,'special_offer')+'.':''}`;
     text+=`\n${get(r,'location')} · ${money(r)} · ${get(r,'duration_hours')} hours`;
-    if(!/^(show|list) all tours$/.test(q)) text+='\n'+get(r,'description').replace(/\s*Note to AI:[\s\S]*$/i,'');
-    text+='\n'+availability(r);
-    if(get(r,'special_offer')) text+='\nOffer: '+get(r,'special_offer');
-    if(shown.length===1 || dateQuestion) text+='\n'+schedule(r);
+    if(/\b(description|details|about|more)\b/.test(q) && shown.length===1) text+='\n'+get(r,'description').replace(/\s*Note to AI:[\s\S]*$/i,'');
+    if(slots) text+='\n'+availability(r);
+    if(/\b(offer|offers|discount|discounts)\b/.test(q) && get(r,'special_offer')) text+='\nOffer: '+get(r,'special_offer');
+    if(dateQuestion) text+='\n'+schedule(r);
     return text;
   }).join('\n\n');
   const lead=shown.length===1?'Here’s what you need to know:':`Here are ${shown.length} ${matches.length>5?'of '+matches.length+' ':''}options to explore:`;
