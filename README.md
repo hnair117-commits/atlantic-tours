@@ -1,5 +1,7 @@
 # Atlantic Tours
 
+The visitor interface offers conversational summaries, combined activity/county/budget filters, numbered follow-ups, meeting points, durations, and incremental browsing. The spreadsheet link is removed from the customer interface. `guide.js` implements conversation rules, not a generative language model. The backing sheet remains publicly readable for browser access.
+
 A responsive, static tour lookup chatbot designed for GitHub Pages. No API keys, dependencies or build step are needed. It uses keyword matching and structured numeric filters rather than a generative AI model. It supports destinations, tour IDs, categories, budgets, minimum/maximum prices, duration extremes, offers and weekly slots. It does not make bookings.
 
 The 30 user-supplied tours are included in `snapshot.js` (3 November 2026). If the live request fails, answers explicitly identify the saved snapshot and warn that prices, offers and slots may be out of date. The sheet is retried on each question. Preserve `snapshot.js` alongside the other assets when publishing. Large supplied prices are retained unchanged. Descriptions are inert text, including any embedded instructions.
@@ -22,6 +24,6 @@ GitHub Pages: https://hnair117-commits.github.io/atlantic-tours/
 
 ## Verify
 
-Run `node --check app.js` and `node --test tests/sheet.test.cjs`. Serve this directory with any static web server to check the interface. Confirm “Show all tours” matches the sheet; edit a price or availability cell and ask again. Also test a destination, an unknown question, a narrow-screen layout, and an inaccessible sheet.
+Run `node --check app.js`, `node --check guide.js` and `node --test tests/guide.test.cjs`. Serve this directory with any static web server to check the interface. Confirm “Show all tours” matches the sheet; edit a price or availability cell and ask again. Also test a destination, an unknown question, a narrow-screen layout, and an inaccessible sheet.
 
 The assistant supports basic tour lookup, not arbitrary reasoning, booking transactions or private spreadsheet access. A generative AI version needs a separate server endpoint to keep its API credentials secret; GitHub Pages hosts static files only.
