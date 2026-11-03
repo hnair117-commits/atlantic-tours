@@ -16,7 +16,9 @@ Each submitted question requests fresh data with the cache disabled. Google can 
 
 Create a public GitHub repository named `atlantic-tours`, upload these files to its root, then select **Settings → Pages → Deploy from a branch → main → /(root) → Save**. The resulting URL is `https://YOUR-USERNAME.github.io/atlantic-tours/`.
 
-Repository creation and Pages activation require authenticated GitHub access; neither has been performed yet.
+Repository: https://github.com/hnair117-commits/atlantic-tours
+
+GitHub Pages: https://hnair117-commits.github.io/atlantic-tours/
 
 ## Verify
 
