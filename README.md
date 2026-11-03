@@ -1,5 +1,7 @@
 # Atlantic Tours
 
+Broad county queries such as “Galway” now ask about interests before showing individual tours. Available activity choices are derived from current data; the county and chosen activity persist for later budget and detail questions. “Start over” resets these preferences.
+
 The visitor interface offers conversational summaries, combined activity/county/budget filters, numbered follow-ups, meeting points, durations, and incremental browsing. The spreadsheet link is removed from the customer interface. `guide.js` implements conversation rules, not a generative language model. The backing sheet remains publicly readable for browser access.
 
 A responsive, static tour lookup chatbot designed for GitHub Pages. No API keys, dependencies or build step are needed. It uses keyword matching and structured numeric filters rather than a generative AI model. It supports destinations, tour IDs, categories, budgets, minimum/maximum prices, duration extremes, offers and weekly slots. It does not make bookings.

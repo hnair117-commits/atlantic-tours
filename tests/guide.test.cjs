@@ -23,3 +23,25 @@ test('snapshot warnings remain visible',async()=>{const {ask,run}=setup();await 
 test('description instructions stay out of replies',()=>{const {ask}=setup();assert.doesNotMatch(ask('ACT017'),/Note to AI/);});
 test('parser preserves zero and rejects errors',()=>{const {run}=setup();assert.equal(run(`parseSheet('callback({"table":{"cols":[{"label":"slots_this_week"}],"rows":[{"c":[{"v":0}]}]}})')[0][0].value`),'0');assert.throws(()=>run(`parseSheet('{"status":"error"}')`));});
 test('no visitor spreadsheet link and correct script order',()=>{const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');assert.doesNotMatch(html,/sheet-link|View tour sheet|docs.google.com/);assert.ok(html.indexOf('guide.js')<html.indexOf('app.js'));});
+test('Galway opens with activity choices, not tour records',()=>{
+ const {ask}=setup();const a=ask('Galway');
+ assert.match(a,/quite a few tours around Galway/);assert.match(a,/food experiences/);assert.match(a,/What are you interested in/);
+ assert.doesNotMatch(a,/ACT\d|€|Galway City Food Tour|slots/);
+});
+test('destination preference persists through activity and budget replies',()=>{
+ const {ask}=setup();ask('Galway');const food=ask('I am interested in food');
+ assert.match(food,/ideas around Galway/);assert.match(food,/Galway City Food Tour/);assert.doesNotMatch(food,/ACT\d|description|slots/);
+ const budget=ask('under €70');assert.match(budget,/Galway City Food Tour/);assert.doesNotMatch(budget,/Cliffs of Moher|Oyster|Inis Meain/);
+});
+test('discovery uses categories present in the selected county',()=>{
+ const {ask}=setup();const a=ask('Mayo');assert.match(a,/cycling/);assert.doesNotMatch(a,/food experiences|kayaking/);
+});
+test('switching counties clears previous activity preference',()=>{
+ const {ask}=setup();ask('Galway');ask('food');ask('Clare');assert.match(ask('kayaking'),/Sea Cave Kayaking/);
+});
+test('discovery questions still use current rows',()=>{
+ const {ask,run}=setup();run('tours=tours.filter(r=>field(r,"category")!=="Food Tour")');assert.doesNotMatch(ask('Galway'),/food experiences/);
+});
+test('start over clears destination preference',()=>{
+ const {ask}=setup();ask('Galway');ask('start over');assert.match(ask('food'),/Galway City Food/);
+});
